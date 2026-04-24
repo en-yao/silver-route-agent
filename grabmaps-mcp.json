@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "grab-maps-playground": {
+      "url": "https://maps.grab.com/api/v1/mcp",
+      "headers": {
+        "Authorization": "Bearer mcp_1776994897_OYyPDi7g3dlCG9CbESXtYIVe"
+      }
+    }
+  }
+}
