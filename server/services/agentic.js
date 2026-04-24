@@ -107,7 +107,11 @@ function strategyLabel(strategy) {
 }
 
 function formatHazardName(hazard) {
-  return String(hazard.analysis.obstacle_type || 'hazard').replaceAll('_', ' ');
+  const type = String(hazard.analysis.obstacle_type || 'hazard').toLowerCase();
+  if (type === 'construction_barrier') {
+    return 'walking hazard';
+  }
+  return type.replaceAll('_', ' ');
 }
 
 function isRouteWithinGuardrail(route, baselineRoute) {
@@ -661,8 +665,11 @@ export async function buildRoutePlanWithAgent(payload) {
     let effectiveStop = selectedStop;
     let poiCandidates = [...stopStore.values()].flat().slice(0, 3);
     let previousRoute = null;
-    const explicitNeedCategory = summarizeNeed(payload.need);
-    const budgetNeedCategory = explicitNeedCategory ? '' : inferBudgetComfortNeed(effectiveRoute, profile);
+    const explicitNeedCategory = payload.disableComfortContext ? '' : summarizeNeed(payload.need);
+    const budgetNeedCategory =
+      payload.disableComfortContext || explicitNeedCategory
+        ? ''
+        : inferBudgetComfortNeed(effectiveRoute, profile);
 
     if (!effectiveStop && budgetNeedCategory && poiCandidates.length === 0) {
       const budgetStopSearch = await searchSupportPlaces(
@@ -877,7 +884,8 @@ export async function analyzeObstacleAndMaybeReplanWithAgent(payload) {
     origin: payload.origin,
     destination: payload.destination,
     currentLocation,
-    need: payload.need,
+    need: '',
+    disableComfortContext: true,
     safetyPriority: analysis.recommended_action === 'reroute'
   });
 

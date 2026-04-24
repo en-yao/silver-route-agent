@@ -1,5 +1,13 @@
 import { useState } from 'react';
 
+function obstacleLabel(obstacleType = '') {
+  const normalized = String(obstacleType).toLowerCase();
+  if (normalized === 'construction_barrier') {
+    return 'walking hazard';
+  }
+  return normalized.replaceAll('_', ' ');
+}
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -75,7 +83,7 @@ export default function ObstacleCapture({
               alt="Obstacle image used for VLM analysis"
             />
           ) : null}
-          <strong>{lastObstacle.analysis.obstacle_type.replaceAll('_', ' ')}</strong>
+          <strong>{obstacleLabel(lastObstacle.analysis.obstacle_type)}</strong>
           <span>
             {lastObstacle.analysis.analysis_mode === 'vision'
               ? 'Vision analysis succeeded'

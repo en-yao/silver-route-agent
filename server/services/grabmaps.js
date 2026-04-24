@@ -188,17 +188,22 @@ export async function searchPlaces(keyword, bias) {
     return searchFixturePlaces(keyword).map(normalizePlace);
   }
 
-  const params = new URLSearchParams({
-    keyword,
-    country: 'SGP',
-    limit: '5'
-  });
-  if (bias) {
-    params.set('location', `${bias.lat},${bias.lng}`);
-  }
+  try {
+    const params = new URLSearchParams({
+      keyword,
+      country: 'SGP',
+      limit: '5'
+    });
+    if (bias) {
+      params.set('location', `${bias.lat},${bias.lng}`);
+    }
 
-  const data = await fetchJson(`${baseUrl}/api/v1/maps/poi/v1/search?${params}`);
-  return (data.places ?? []).map(normalizePlace);
+    const data = await fetchJson(`${baseUrl}/api/v1/maps/poi/v1/search?${params}`);
+    return (data.places ?? []).map(normalizePlace);
+  } catch (error) {
+    console.warn('Falling back to fixture searchPlaces.', error);
+    return searchFixturePlaces(keyword).map(normalizePlace);
+  }
 }
 
 export async function findBestPlace(query, bias) {
@@ -211,11 +216,16 @@ export async function reverseGeocode(position) {
     return normalizePlace(findFixturePlace('Tiong Bahru MRT'));
   }
 
-  const params = new URLSearchParams({
-    location: `${position.lat},${position.lng}`
-  });
-  const data = await fetchJson(`${baseUrl}/api/v1/maps/poi/v1/reverse-geo?${params}`);
-  return normalizePlace(data.places?.[0] ?? findFixturePlace('Tiong Bahru MRT'));
+  try {
+    const params = new URLSearchParams({
+      location: `${position.lat},${position.lng}`
+    });
+    const data = await fetchJson(`${baseUrl}/api/v1/maps/poi/v1/reverse-geo?${params}`);
+    return normalizePlace(data.places?.[0] ?? findFixturePlace('Tiong Bahru MRT'));
+  } catch (error) {
+    console.warn('Falling back to fixture reverseGeocode.', error);
+    return normalizePlace(findFixturePlace('Tiong Bahru MRT'));
+  }
 }
 
 export async function nearbySearch(position, keyword) {
@@ -223,32 +233,37 @@ export async function nearbySearch(position, keyword) {
     return getFixtureNearby(keyword).map(normalizePlace);
   }
 
-  const params = new URLSearchParams({
-    location: `${position.lat},${position.lng}`,
-    radius: '0.4',
-    limit: '10',
-    rankBy: 'distance'
-  });
+  try {
+    const params = new URLSearchParams({
+      location: `${position.lat},${position.lng}`,
+      radius: '0.4',
+      limit: '10',
+      rankBy: 'distance'
+    });
 
-  const data = await fetchJson(`${baseUrl}/api/v1/maps/place/v2/nearby?${params}`);
-  const places = (data.places ?? []).map(normalizePlace);
-  if (!keyword) {
-    return places;
+    const data = await fetchJson(`${baseUrl}/api/v1/maps/place/v2/nearby?${params}`);
+    const places = (data.places ?? []).map(normalizePlace);
+    if (!keyword) {
+      return places;
+    }
+
+    const keywordPlaces = await searchPlaces(keyword, position);
+    const normalized = keyword.toLowerCase();
+    const rankedNearby = places
+      .map((place) => ({
+        place,
+        matchScore:
+          (place.name.toLowerCase().includes(normalized) ? 2 : 0) +
+          (String(place.category).toLowerCase().includes(normalized) ? 2 : 0)
+      }))
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .map((entry) => entry.place);
+
+    return dedupePlaces([...rankedNearby, ...keywordPlaces]);
+  } catch (error) {
+    console.warn('Falling back to fixture nearbySearch.', error);
+    return getFixtureNearby(keyword).map(normalizePlace);
   }
-
-  const keywordPlaces = await searchPlaces(keyword, position);
-  const normalized = keyword.toLowerCase();
-  const rankedNearby = places
-    .map((place) => ({
-      place,
-      matchScore:
-        (place.name.toLowerCase().includes(normalized) ? 2 : 0) +
-        (String(place.category).toLowerCase().includes(normalized) ? 2 : 0)
-    }))
-    .sort((a, b) => b.matchScore - a.matchScore)
-    .map((entry) => entry.place);
-
-  return dedupePlaces([...rankedNearby, ...keywordPlaces]);
 }
 
 export function getRoutePoint(place) {
@@ -271,14 +286,19 @@ export async function getDirections(points) {
     return getFixtureDirections(hasWaypoint);
   }
 
-  const params = new URLSearchParams();
-  for (const point of points) {
-    params.append('coordinates', `${point.lng},${point.lat}`);
-  }
-  params.set('profile', 'walking');
-  params.set('overview', 'full');
-  params.set('alternatives', '2');
+  try {
+    const params = new URLSearchParams();
+    for (const point of points) {
+      params.append('coordinates', `${point.lng},${point.lat}`);
+    }
+    params.set('profile', 'walking');
+    params.set('overview', 'full');
+    params.set('alternatives', '2');
 
-  const data = await fetchJson(`${baseUrl}/api/v1/maps/eta/v1/direction?${params}`);
-  return (data.routes ?? []).map((route, index) => routeToGeo(route, index));
+    const data = await fetchJson(`${baseUrl}/api/v1/maps/eta/v1/direction?${params}`);
+    return (data.routes ?? []).map((route, index) => routeToGeo(route, index));
+  } catch (error) {
+    console.warn('Falling back to fixture getDirections.', error);
+    return getFixtureDirections(hasWaypoint);
+  }
 }
